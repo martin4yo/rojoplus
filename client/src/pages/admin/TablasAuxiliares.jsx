@@ -56,7 +56,7 @@ export default function TablasAuxiliares() {
   const [guardandoRecargo, setGuardandoRecargo] = useState(false)
 
   // Configuración de vigencia automática por morosidad
-  const [vigencia, setVigencia] = useState({ bloqueoActivo: false, diasGracia: '0' })
+  const [vigencia, setVigencia] = useState({ bloqueoActivo: false, diasGracia: '0', minCuotas: '2' })
   const [guardandoVigencia, setGuardandoVigencia] = useState(false)
 
   // Configuración descuento anticipado
@@ -251,6 +251,7 @@ export default function TablasAuxiliares() {
       setVigencia({
         bloqueoActivo: map['MOROSIDAD_BLOQUEO_AUTO_ACTIVO'] === 'true',
         diasGracia: val('MOROSIDAD_DIAS_GRACIA', '0'),
+        minCuotas: val('MOROSIDAD_MIN_CUOTAS_VENCIDAS', '2'),
       })
 
       // Fiscal
@@ -418,6 +419,11 @@ export default function TablasAuxiliares() {
       setError('Los días de gracia deben ser un número >= 0')
       return
     }
+    const minCuotas = parseInt(vigencia.minCuotas, 10)
+    if (!Number.isFinite(minCuotas) || minCuotas < 1) {
+      setError('El umbral debe ser un número >= 1 (cuántas cuotas vencidas bloquean al socio)')
+      return
+    }
     setGuardandoVigencia(true)
     setError(null)
     try {
@@ -433,6 +439,12 @@ export default function TablasAuxiliares() {
           tipo: 'INTEGER',
           modulo: 'MOROSIDAD',
           descripcion: 'Días de gracia después del vencimiento antes de bloquear',
+        }),
+        api.put('/admin/sistema/configuracion/MOROSIDAD_MIN_CUOTAS_VENCIDAS', {
+          valor: String(minCuotas),
+          tipo: 'INTEGER',
+          modulo: 'MOROSIDAD',
+          descripcion: 'Cuántas cuotas vencidas (períodos distintos) hacen falta para bloquear',
         }),
       ])
       setSuccess('Configuración de vigencia guardada')
@@ -1340,6 +1352,26 @@ export default function TablasAuxiliares() {
 
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cuotas vencidas para bloquear
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={vigencia.minCuotas}
+                      onChange={(e) => setVigencia({ ...vigencia, minCuotas: e.target.value })}
+                      className="input-field w-20"
+                      min="1"
+                      step="1"
+                    />
+                    <span className="text-gray-500">cuotas o más</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Se cuentan períodos distintos. Los cargos sueltos (sin período) no suman
+                  </p>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Días de gracia
                   </label>
                   <div className="flex items-center gap-2">
@@ -1355,6 +1387,15 @@ export default function TablasAuxiliares() {
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
                     No se bloquea hasta que pasen estos días desde el vencimiento
+                  </p>
+                </div>
+
+                <div className="mt-3 p-2 bg-amber-50 border border-amber-100 rounded-lg">
+                  <p className="text-xs text-amber-800">
+                    Se bloquea al socio con{' '}
+                    <span className="font-semibold">{vigencia.minCuotas || '?'} cuota{Number(vigencia.minCuotas) === 1 ? '' : 's'} vencida{Number(vigencia.minCuotas) === 1 ? '' : 's'} o más</span>
+                    {Number(vigencia.diasGracia) > 0 && <>, pasados <span className="font-semibold">{vigencia.diasGracia} días</span> del vencimiento</>}
+                    . Alcanza con que un miembro del grupo familiar llegue al umbral para que se bloquee toda la familia.
                   </p>
                 </div>
 
