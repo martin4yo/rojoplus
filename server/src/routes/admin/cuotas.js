@@ -1855,6 +1855,9 @@ router.post('/pagos', authAdmin, asyncHandler(async (req, res) => {
             monto: montoMov,
             descripcion: `Cobranza cuotas socio #${socioId} - Recibo ${nuevoNumero}`,
             pagoId: pago.id,
+            // Sin esto el movimiento queda sin socio en el detalle de caja: la
+            // descripción nombraba al socio pero el campo Socio/Entidad venía vacío.
+            socioId: pago.socioId,
             registradoPor: req.admin.id,
             centroCostoId: grupo.centroCostoId,
             conciliado: !cajaActual.requiereConciliacion,
