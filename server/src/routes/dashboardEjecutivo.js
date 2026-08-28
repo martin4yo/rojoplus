@@ -35,6 +35,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
         { fechaFin: null },
         { fechaFin: { gte: hoy } },
       ],
+      socio: { estadoSocioRel: { esSocioActivo: true } },
     },
     select: { socioId: true },
     distinct: ['socioId'],
@@ -279,6 +280,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
         { fechaFin: null },
         { fechaFin: { gte: hoy } },
       ],
+      socio: { estadoSocioRel: { esSocioActivo: true } },
     },
   })
 
@@ -288,13 +290,15 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     where: {
       estado: 'ACTIVA',
       fechaInicio: { gte: inicioMesActual, lte: finMesActual },
+      socio: { estadoSocioRel: { esSocioActivo: true } },
     },
   })
 
   // Inscripciones por actividad (top 5) — agrupado por Actividad (sumando todas sus categorías)
+  // Solo socios activos (esSocioActivo: true), para no contar bajas cuya inscripción quedó sin cerrar.
   const inscripcionesPorCategoria = await req.db.inscripcion.groupBy({
     by: ['categoriaActividadId'],
-    where: { estado: 'ACTIVA' },
+    where: { estado: 'ACTIVA', socio: { estadoSocioRel: { esSocioActivo: true } } },
     _count: true,
   })
 
@@ -346,7 +350,7 @@ router.get('/ejecutivo', authAdmin, asyncHandler(async (req, res) => {
     include: {
       actividad: { select: { nombre: true } },
       inscripciones: {
-        where: { estado: 'ACTIVA' },
+        where: { estado: 'ACTIVA', socio: { estadoSocioRel: { esSocioActivo: true } } },
         select: { id: true },
       },
     },
